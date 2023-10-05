@@ -4,8 +4,11 @@
 import argparse
 import inquirer
 
-
 def main() -> None:
+    args = parse_arguments()
+
+    #https://pypi.org/project/inquirer/
+
     exit(0)
 
 
