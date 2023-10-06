@@ -12,22 +12,16 @@ from inquirer import errors
 def main() -> None:
     args = parse_arguments()
 
-    if args.f != "":
-        os.chdir(args.f)
-
+    code: int = 0
     if args.action == "branch":
-        branch()
+        code = branch(args.f)
     elif args.action == "push":
-        push()
+        code = push(args.f)
 
-    print(args)
-
-    # https://pypi.org/project/inquirer/
-
-    exit(0)
+    exit(code)
 
 
-def branch() -> None:
+def branch(cwd: str) -> int:
     questions = [
         inquirer.List('change_type', message="Type of change", choices=['feature', 'fix'], carousel=True,
                       validate=validate_answer),
@@ -42,7 +36,15 @@ def branch() -> None:
 
     branch_name = f"{change_type}/{ticket_number}/{ticket_name}"
 
-    run_cmd(f"git checkout -b {branch_name}")
+    code = run_cmd(f"git checkout -b {branch_name}", cwd)
+    if code == 0:
+        print(f"Switched to the branch {branch_name}")
+        code = run_cmd(f"git push --set-upstream origin {branch_name}", cwd)
+
+    if code != 0:
+        print("Something was wrong when executing the commands")
+
+    return code
 
 
 def sanitize_string_uc(value: str) -> str:
@@ -53,19 +55,21 @@ def sanitize_string(value: str) -> str:
     return re.sub(r'[^a-z0-9_-]', '', re.sub(r'\s+', '-', value.strip().lower()))
 
 
-def validate_answer(answers, current) -> bool:
+def validate_answer(_, current) -> bool:
     if current.strip() == "":
         raise errors.ValidationError('', reason='The answer should not be empty.')
 
     return True
 
 
-def run_cmd(cmd: str) -> None:
-    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ)
+def run_cmd(cmd: str, cwd: str) -> int:
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ, cwd=cwd)
+    return result.returncode
 
 
-def push() -> None:
+def push(cwd: str) -> int:
     print("Push!")
+    return 0
 
 
 def parse_arguments():
