@@ -31,8 +31,8 @@ def branch(cwd: str) -> int:
     answers = inquirer.prompt(questions)
 
     change_type = answers["change_type"]
-    ticket_number = sanitize_string_uc(answers["ticket_number"])
-    ticket_name = sanitize_string(answers["ticket_name"])
+    ticket_number = sanitize_string(answers["ticket_number"].upper())
+    ticket_name = sanitize_string(answers["ticket_name"].lower())
 
     branch_name = f"{change_type}/{ticket_number}/{ticket_name}"
 
@@ -47,12 +47,8 @@ def branch(cwd: str) -> int:
     return code
 
 
-def sanitize_string_uc(value: str) -> str:
-    return re.sub(r'[^A-Z0-9_-]', '', re.sub(r'\s+', '-', value.strip().upper()))
-
-
 def sanitize_string(value: str) -> str:
-    return re.sub(r'[^a-z0-9_-]', '', re.sub(r'\s+', '-', value.strip().lower()))
+    return re.sub(r'[^A-Z0-9-]', '', re.sub(r'\s+', '-', re.sub(r'_', '-', value.strip())))
 
 
 def validate_answer(_, current) -> bool:
