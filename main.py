@@ -25,13 +25,17 @@ def branch(cwd: str) -> int:
     questions = [
         inquirer.List('change_type', message="Type of change", choices=['feature', 'fix'], carousel=True,
                       validate=validate_answer),
-        inquirer.Text('ticket_number', message="Ticket number", validate=validate_answer),
+        inquirer.Text('ticket_number', message="Ticket number (leave empty for NO-TICKET)"),
         inquirer.Text('ticket_name', message="Ticket name", validate=validate_answer)
     ]
     answers = inquirer.prompt(questions)
 
     change_type = answers["change_type"]
-    ticket_number = sanitize_string(answers["ticket_number"].upper())
+
+    ticket_number: str = "NO-TICKET"
+    if answers["ticket_number"] != "":
+        ticket_number = sanitize_string(answers["ticket_number"].upper())
+
     ticket_name = sanitize_string(answers["ticket_name"].lower())
 
     branch_name = f"{change_type}/{ticket_number}/{ticket_name}"
@@ -48,7 +52,7 @@ def branch(cwd: str) -> int:
 
 
 def sanitize_string(value: str) -> str:
-    return re.sub(r'[^A-Z0-9-]', '', re.sub(r'\s+', '-', re.sub(r'_', '-', value.strip())))
+    return re.sub(r'[^a-zA-Z0-9-]', '', re.sub(r'\s+', '-', re.sub(r'_', '-', value.strip())))
 
 
 def validate_answer(_, current) -> bool:
@@ -59,7 +63,8 @@ def validate_answer(_, current) -> bool:
 
 
 def run_cmd(cmd: str, cwd: str) -> int:
-    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ, cwd=cwd)
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ,
+                            cwd=cwd)
     return result.returncode
 
 
