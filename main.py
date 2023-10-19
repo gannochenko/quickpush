@@ -53,7 +53,7 @@ def branch(cwd: str) -> int:
         print(f"Switched to the branch {branch_name}")
         code = run_cmd(f"git push --set-upstream origin {branch_name}", cwd)
 
-        if code != 0:
+        if code == 0:
             branch_description = BranchDescription(change_type, ticket_number, ticket_name)
             branch_description_serialized = json.dumps(branch_description)
 
