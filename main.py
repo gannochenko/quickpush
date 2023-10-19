@@ -55,7 +55,7 @@ def branch(cwd: str) -> int:
 
         if code == 0:
             branch_description = BranchDescription(change_type, ticket_number, ticket_name)
-            branch_description_serialized = json.dumps(branch_description)
+            branch_description_serialized = json.dumps(branch_description.__dict__)
 
             code = run_cmd(f"git config branch.{branch_name}.description {branch_description_serialized}", cwd)
 
