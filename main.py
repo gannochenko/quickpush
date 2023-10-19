@@ -8,6 +8,7 @@ import inquirer
 import subprocess
 from inquirer import errors
 import json
+import base64
 
 
 class BranchDescription:
@@ -55,9 +56,9 @@ def branch(cwd: str) -> int:
 
         if code == 0:
             branch_description = BranchDescription(change_type, ticket_number, ticket_name)
-            branch_description_serialized = json.dumps(branch_description.__dict__)
+            branch_description_encoded = base64_encode(json.dumps(branch_description.__dict__))
 
-            code = run_cmd(f"git config branch.{branch_name}.description {branch_description_serialized}", cwd)
+            code = run_cmd(f"git config branch.{branch_name}.description {branch_description_encoded}", cwd)
 
     if code != 0:
         print("Something was wrong when executing the commands")
@@ -74,6 +75,10 @@ def validate_answer(_, current) -> bool:
         raise errors.ValidationError('', reason='The answer should not be empty.')
 
     return True
+
+
+def base64_encode(value: str) -> str:
+    return base64.b64encode(value.encode('utf-8')).decode('utf-8')
 
 
 def run_cmd(cmd: str, cwd: str) -> int:
