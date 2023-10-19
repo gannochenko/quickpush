@@ -7,6 +7,14 @@ import re
 import inquirer
 import subprocess
 from inquirer import errors
+import json
+
+
+class BranchDescription:
+    def __init__(self, change_type: str, ticket_number: str, ticket_name: str):
+        self.change_type = change_type
+        self.ticket_number = ticket_number
+        self.ticket_name = ticket_name
 
 
 def main() -> None:
@@ -44,6 +52,12 @@ def branch(cwd: str) -> int:
     if code == 0:
         print(f"Switched to the branch {branch_name}")
         code = run_cmd(f"git push --set-upstream origin {branch_name}", cwd)
+
+        if code != 0:
+            branch_description = BranchDescription(change_type, ticket_number, ticket_name)
+            branch_description_serialized = json.dumps(branch_description)
+
+            code = run_cmd(f"git config branch.{branch_name}.description {branch_description_serialized}", cwd)
 
     if code != 0:
         print("Something was wrong when executing the commands")
