@@ -55,15 +55,27 @@ def branch(cwd: str) -> int:
         code = run_cmd(f"git push --set-upstream origin {branch_name}", cwd)
 
         if code == 0:
-            branch_description = BranchDescription(change_type, ticket_number, ticket_name)
-            branch_description_encoded = base64_encode(json.dumps(branch_description.__dict__))
-
-            code = run_cmd(f"git config branch.{branch_name}.description {branch_description_encoded}", cwd)
+            code = set_branch_description(cwd, branch_name, change_type, ticket_number, ticket_name)
 
     if code != 0:
         print("Something was wrong when executing the commands")
 
     return code
+
+
+def set_branch_description(cwd: str, branch_name: str, change_type: str, ticket_number: str, ticket_name: str) -> int:
+    branch_description = BranchDescription(change_type, ticket_number, ticket_name)
+    branch_description_encoded = base64_encode(json.dumps(branch_description.__dict__))
+
+    return run_cmd(f"git config branch.{branch_name}.description {branch_description_encoded}", cwd)
+
+
+def get_branch_description(cwd: str, branch_name: str) -> BranchDescription:
+    branch_description = run_cmd_get_stdout(f"git config \"branch.{branch_name}.description\"", cwd)
+    branch_description = base64_decore(branch_description.rstrip("\r\n").rstrip("\n"))
+    branch_description_json = json.loads(branch_description)
+
+    return BranchDescription(**branch_description_json)
 
 
 def sanitize_string(value: str) -> str:
@@ -81,14 +93,33 @@ def base64_encode(value: str) -> str:
     return base64.b64encode(value.encode('utf-8')).decode('utf-8')
 
 
+def base64_decore(value: str) -> str:
+    return base64.b64decode(value.encode('utf-8')).decode('utf-8')
+
+
 def run_cmd(cmd: str, cwd: str) -> int:
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ,
                             cwd=cwd)
     return result.returncode
 
 
+def run_cmd_get_stdout(cmd: str, cwd: str) -> str:
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ,
+                            cwd=cwd)
+    return result.stdout
+
+
 def push(cwd: str) -> int:
     print("Push!")
+
+    branch_name = run_cmd_get_stdout("git branch --show-current", cwd).rstrip("\r\n").rstrip("\n")
+    print(branch_name)
+
+    branch_description = get_branch_description(cwd, branch_name)
+    print(branch_description.ticket_name)
+    print(branch_description.ticket_number)
+    print(branch_description.change_type)
+
     return 0
 
 
