@@ -20,6 +20,12 @@ class BranchDescription:
         self.ticket_name = ticket_name
 
 
+class Remote:
+    def __init__(self, repo_name: str, owner: str):
+        self.repo_name = repo_name
+        self.owner = owner
+
+
 def main() -> None:
     args = parse_arguments()
 
@@ -80,6 +86,15 @@ def get_branch_description(cwd: str, branch_name: str) -> BranchDescription:
     return BranchDescription(**branch_description_json)
 
 
+def get_remote(cwd: str) -> Remote:
+    remote = run_cmd_get_stdout(f"git config --get remote.origin.url", cwd)
+    pattern = r"git@github\.com:([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)\.git"
+
+    matches = re.findall(pattern, remote)
+
+    return Remote(repo_name=matches[0][1], owner=matches[0][0])
+
+
 def sanitize_string(value: str) -> str:
     return re.sub(r'[^a-zA-Z0-9-]', '', re.sub(r'\s+', '-', re.sub(r'_', '-', value.strip())))
 
@@ -116,9 +131,12 @@ def pr(cwd: str) -> int:
     print(branch_name)
 
     branch_description = get_branch_description(cwd, branch_name)
-    print(branch_description.ticket_name)
-    print(branch_description.ticket_number)
-    print(branch_description.change_type)
+    # print(branch_description.ticket_name)
+    # print(branch_description.ticket_number)
+    # print(branch_description.change_type)
+
+    remote = get_remote(cwd)
+    print(remote)
 
     token = os.getenv("GITHUB_TOKEN")
     if token == "":
@@ -128,7 +146,7 @@ def pr(cwd: str) -> int:
     auth = Auth.Token(os.getenv("GITHUB_TOKEN"))
     gh = Github(auth=auth)
 
-    gh.get_repo("ff").create_pull(
+    gh.get_repo(remote.repo_name).create_pull(
         base="master",
         head=branch_name
     )
