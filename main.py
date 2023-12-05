@@ -9,6 +9,8 @@ import subprocess
 from inquirer import errors
 import json
 import base64
+from github import Github
+from github import Auth
 
 
 class BranchDescription:
@@ -24,8 +26,8 @@ def main() -> None:
     code: int = 0
     if args.action == "branch":
         code = branch(args.f)
-    elif args.action == "push":
-        code = push(args.f)
+    elif args.action == "pr":
+        code = pr(args.f)
 
     exit(code)
 
@@ -109,9 +111,7 @@ def run_cmd_get_stdout(cmd: str, cwd: str) -> str:
     return result.stdout
 
 
-def push(cwd: str) -> int:
-    print("Push!")
-
+def pr(cwd: str) -> int:
     branch_name = run_cmd_get_stdout("git branch --show-current", cwd).rstrip("\r\n").rstrip("\n")
     print(branch_name)
 
@@ -120,13 +120,28 @@ def push(cwd: str) -> int:
     print(branch_description.ticket_number)
     print(branch_description.change_type)
 
+    token = os.getenv("GITHUB_TOKEN")
+    if token == "":
+        print("No github token found. Make sure the GITHUB_TOKEN is defined")
+        return 1
+
+    auth = Auth.Token(os.getenv("GITHUB_TOKEN"))
+    gh = Github(auth=auth)
+
+    gh.get_repo("ff").create_pull(
+        base="master",
+        head=branch_name
+    )
+
+    gh.close()
+
     return 0
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(prog='Quick Push', description="A helper tool for faster PR creation")
 
-    parser.add_argument("action", choices=["branch", "push"], help="What to do")
+    parser.add_argument("action", choices=["branch", "pr"], help="What to do")
     parser.add_argument("--f", type=str, help="Folder to work in")
 
     return parser.parse_args()
