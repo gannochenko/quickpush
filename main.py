@@ -69,7 +69,7 @@ def branch(cwd: str) -> int:
         code = run_cmd(f"git push --set-upstream origin {branch_name}", cwd)
 
         if code == 0:
-            code = set_branch_description(cwd, branch_name, change_type, ticket_number, ticket_name)
+            code = set_branch_description(cwd, branch_name, change_type, ticket_number, answers["ticket_name"])
 
     if code != 0:
         print("Something was wrong when executing the commands")
