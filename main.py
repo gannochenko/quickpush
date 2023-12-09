@@ -12,6 +12,7 @@ import base64
 from github import Github
 from github import Auth
 
+pr_template_file_path = "./.github/pull_request_template.md"
 
 class BranchDescription:
     def __init__(self, change_type: str, ticket_number: str, ticket_name: str):
@@ -30,10 +31,15 @@ def main() -> None:
     args = parse_arguments()
 
     code: int = 0
-    if args.action == "branch":
-        code = branch(args.f)
-    elif args.action == "pr":
-        code = pr(args.f)
+
+    try:
+        if args.action == "branch":
+            code = branch(args.f)
+        elif args.action == "pr":
+            code = pr(args.f)
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        code = 1
 
     exit(code)
 
@@ -80,6 +86,9 @@ def set_branch_description(cwd: str, branch_name: str, change_type: str, ticket_
 
 def get_branch_description(cwd: str, branch_name: str) -> BranchDescription:
     branch_description = run_cmd_get_stdout(f"git config \"branch.{branch_name}.description\"", cwd)
+    if branch_description == "":
+        raise Exception("current branch misses the description")
+
     branch_description = base64_decore(branch_description.rstrip("\r\n").rstrip("\n"))
     branch_description_json = json.loads(branch_description)
 
@@ -128,15 +137,13 @@ def run_cmd_get_stdout(cmd: str, cwd: str) -> str:
 
 def pr(cwd: str) -> int:
     branch_name = run_cmd_get_stdout("git branch --show-current", cwd).rstrip("\r\n").rstrip("\n")
-    print(branch_name)
-
     branch_description = get_branch_description(cwd, branch_name)
-    # print(branch_description.ticket_name)
-    # print(branch_description.ticket_number)
-    # print(branch_description.change_type)
-
     remote = get_remote(cwd)
-    print(remote)
+
+    body = ""
+    pr_description = get_pr_description_template()
+    if pr_description != "":
+        body = fill_pr_description_template(pr_description, branch_description)
 
     token = os.getenv("GITHUB_TOKEN")
     if token == "":
@@ -146,14 +153,32 @@ def pr(cwd: str) -> int:
     auth = Auth.Token(os.getenv("GITHUB_TOKEN"))
     gh = Github(auth=auth)
 
-    gh.get_repo(remote.repo_name).create_pull(
+    gh.get_repo(f"{remote.owner}/{remote.repo_name}").create_pull(
         base="master",
-        head=branch_name
+        head=branch_name,
+        title=f"{branch_description.change_type}/{branch_description.ticket_number}/{branch_description.ticket_name}",
+        body=body
     )
 
     gh.close()
 
+    print("PR has been created")
+
     return 0
+
+
+def fill_pr_description_template(template: str, branch_description: BranchDescription) -> str:
+    return template.replace("SUP-xxxx", branch_description.ticket_number).replace("{Summary-of-changes}", branch_description.ticket_name)
+
+
+def get_pr_description_template() -> str:
+    if os.path.exists(pr_template_file_path):
+        with open(pr_template_file_path, 'r') as file:
+            return file.read()
+    else:
+        print(f"The PR template file does not exist. Going without description.")
+
+    return ""
 
 
 def parse_arguments():
