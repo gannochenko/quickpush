@@ -157,7 +157,8 @@ def pr(cwd: str) -> int:
         base="master",
         head=branch_name,
         title=f"{branch_description.change_type}/{branch_description.ticket_number}/{branch_description.ticket_name}",
-        body=body
+        body=body,
+        draft=True,
     )
 
     gh.close()
