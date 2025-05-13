@@ -40,6 +40,8 @@ def main() -> None:
             code = branch(args.f)
         elif args.action == "pr":
             code = pr(args.f)
+        elif args.action == "commit":
+            code = commit(args.f, args.message)
     except Exception as e:
         print(f"Error occurred: {e}")
         code = 1
@@ -103,6 +105,13 @@ def get_branch_description(cwd: str, branch_name: str) -> BranchDescription:
     return BranchDescription(**branch_description_json)
 
 
+def retrieve_branch_description(cwd: str) -> BranchDescription:
+    branch_name = run_cmd_get_stdout("git branch --show-current", cwd).rstrip("\r\n").rstrip("\n")
+    branch_description = get_branch_description(cwd, branch_name)
+
+    return branch_description
+
+
 def get_remote(cwd: str) -> Remote:
     remote = run_cmd_get_stdout(f"git config --get remote.origin.url", cwd)
     pattern = r"git@github\.com:([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)\.git"
@@ -141,6 +150,18 @@ def run_cmd_get_stdout(cmd: str, cwd: str) -> str:
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ,
                             cwd=cwd)
     return result.stdout
+
+
+def commit(cwd: str, message: str) -> int:
+    if not message:
+        print("Error: Commit message is required")
+        return 1
+
+    branch_description = retrieve_branch_description(cwd)
+    if branch_description.commit_prefix != "":
+        message = f"{branch_description.commit_prefix}: {message}"
+
+    return run_cmd(f"git commit -m '{message}'", cwd)
 
 
 def pr(cwd: str) -> int:
@@ -214,8 +235,9 @@ def get_pr_description_template() -> str:
 def parse_arguments():
     parser = argparse.ArgumentParser(prog='Quick Push', description="A helper tool for faster PR creation")
 
-    parser.add_argument("action", choices=["branch", "pr"], help="What to do")
+    parser.add_argument("action", choices=["branch", "pr", "commit"], help="What to do")
     parser.add_argument("--f", type=str, help="Folder to work in")
+    parser.add_argument("message", nargs="?", help="Commit message (only used with commit action)")
 
     return parser.parse_args()
 
