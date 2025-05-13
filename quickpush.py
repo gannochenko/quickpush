@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import argparse
@@ -15,10 +15,13 @@ from github import Auth
 pr_template_file_path = "./.github/pull_request_template.md"
 
 class BranchDescription:
-    def __init__(self, change_type: str, ticket_number: str, ticket_name: str):
+    def __init__(self, change_type: str, issue_number: str, issue_title: str, commit_prefix: str, link_to_rfc: str, link_to_slack_thread: str):
         self.change_type = change_type
-        self.ticket_number = ticket_number
-        self.ticket_name = ticket_name
+        self.issue_number = issue_number
+        self.issue_title = issue_title
+        self.commit_prefix = commit_prefix
+        self.link_to_rfc = link_to_rfc
+        self.link_to_slack_thread = link_to_slack_thread
 
 
 class Remote:
@@ -46,22 +49,27 @@ def main() -> None:
 
 def branch(cwd: str) -> int:
     questions = [
-        inquirer.List('change_type', message="Type of change", choices=['feature', 'fix'], carousel=True,
+        inquirer.List('change_type', message="Type of change", choices=['feat', 'fix', 'chore', 'test', 'tmp'], carousel=True,
                       validate=validate_answer),
-        inquirer.Text('ticket_number', message="Ticket number (leave empty for NO-TICKET)"),
-        inquirer.Text('ticket_name', message="Ticket name", validate=validate_answer)
+        inquirer.Text('commit_prefix', message="Commit prefix"),
+        inquirer.Text('issue_number', message="Issue number"),
+        inquirer.Text('link_to_rfc', message="Link to RFC"),
+        inquirer.Text('link_to_slack_thread', message="Link to Slack thread"),
+        inquirer.Text('issue_title', message="Issue title", validate=validate_answer)
     ]
     answers = inquirer.prompt(questions)
 
     change_type = answers["change_type"]
 
-    ticket_number: str = "NO-TICKET"
-    if answers["ticket_number"] != "":
-        ticket_number = sanitize_string(answers["ticket_number"].upper())
+    issue_number: str = ""
+    if answers["issue_number"] != "":
+        issue_number = sanitize_string(answers["issue_number"].upper())
 
-    ticket_name = sanitize_string(answers["ticket_name"].lower())
+    issue_title = sanitize_string(answers["issue_title"].lower())
 
-    branch_name = f"{change_type}/{ticket_number}/{ticket_name}"
+    branch_name = f"{change_type}/{issue_title}"
+    if issue_number != "":
+        branch_name = f"{change_type}/{issue_number}/{issue_title}"
 
     code = run_cmd(f"git checkout -b {branch_name}", cwd)
     if code == 0:
@@ -69,7 +77,7 @@ def branch(cwd: str) -> int:
         code = run_cmd(f"git push --set-upstream origin {branch_name}", cwd)
 
         if code == 0:
-            code = set_branch_description(cwd, branch_name, change_type, ticket_number, answers["ticket_name"])
+            code = set_branch_description(cwd, branch_name, change_type, issue_number, answers["issue_title"], answers["commit_prefix"], answers["link_to_rfc"], answers["link_to_slack_thread"])
 
     if code != 0:
         print("Something was wrong when executing the commands")
@@ -77,8 +85,8 @@ def branch(cwd: str) -> int:
     return code
 
 
-def set_branch_description(cwd: str, branch_name: str, change_type: str, ticket_number: str, ticket_name: str) -> int:
-    branch_description = BranchDescription(change_type, ticket_number, ticket_name)
+def set_branch_description(cwd: str, branch_name: str, change_type: str, issue_number: str, issue_title: str, commit_prefix: str, link_to_rfc: str, link_to_slack_thread: str) -> int:
+    branch_description = BranchDescription(change_type, issue_number, issue_title, commit_prefix, link_to_rfc, link_to_slack_thread)
     branch_description_encoded = base64_encode(json.dumps(branch_description.__dict__))
 
     return run_cmd(f"git config branch.{branch_name}.description {branch_description_encoded}", cwd)
@@ -156,7 +164,7 @@ def pr(cwd: str) -> int:
     gh.get_repo(f"{remote.owner}/{remote.repo_name}").create_pull(
         base="master",
         head=branch_name,
-        title=f"{branch_description.change_type}/{branch_description.ticket_number}/{branch_description.ticket_name}",
+        title=branch_description.issue_title,
         body=body,
         draft=True,
     )
@@ -169,16 +177,37 @@ def pr(cwd: str) -> int:
 
 
 def fill_pr_description_template(template: str, branch_description: BranchDescription) -> str:
-    return template.replace("SUP-xxxx", branch_description.ticket_number).replace("{Summary-of-changes}", branch_description.ticket_name)
+    # Replace RFC link
+    rfc_link = branch_description.link_to_rfc if branch_description.link_to_rfc != "" else "none"
+    template = template.replace("<!-- Link to RFC -->", f"[{rfc_link}]({rfc_link})")
+
+    # Replace Slack thread link
+    slack_link = branch_description.link_to_slack_thread if branch_description.link_to_slack_thread != "" else "none"
+    template = template.replace("<!-- Link to Slack thread -->", f"[{slack_link}]({slack_link})")
+
+    # Replace issue link
+    if branch_description.issue_number != "":
+        issue_link = f"https://github.com/framer/company/issues/{branch_description.issue_number}"
+        issue_text = branch_description.issue_number
+        template = template.replace("<!-- Link to issue -->", f"[{issue_text}]({issue_link})")
+    else:
+        template = template.replace("<!-- Link to issue -->", "none")
+
+
+    return template
 
 
 def get_pr_description_template() -> str:
-    if os.path.exists(pr_template_file_path):
-        with open(pr_template_file_path, 'r') as file:
-            return file.read()
-    else:
-        print(f"The PR template file does not exist. Going without description.")
-
+    current_dir = os.getcwd()
+    
+    while current_dir != "/":
+        template_path = os.path.join(current_dir, pr_template_file_path)
+        if os.path.exists(template_path):
+            with open(template_path, 'r') as file:
+                return file.read()
+        current_dir = os.path.dirname(current_dir)
+    
+    print(f"The PR template file does not exist in any parent directory. Going without description.")
     return ""
 
 
