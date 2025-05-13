@@ -179,7 +179,7 @@ def pr(cwd: str) -> int:
         print("No github token found. Make sure the GITHUB_TOKEN is defined")
         return 1
 
-    auth = Auth.Token(os.getenv("GITHUB_TOKEN"))
+    auth = Auth.Token(token)
     gh = Github(auth=auth)
 
     gh.get_repo(f"{remote.owner}/{remote.repo_name}").create_pull(
